@@ -18,19 +18,27 @@ let
     name = "openwrt-env";
     targetPkgs = pkgs: with pkgs; [
       binutils
+      bison
       file
       fixWrapper
       gcc
       git
       glibc.static
       gnumake
-      ncurses
+      gnupg
+      go
+      libelf
+      llvmPackages_latest.llvm
+      ncdu 
+      ncurses            
       openssl
       patch
       perl
-      pkg-config
-      (python3.withPackages (ps: [ ps.setuptools ]))
+      pkg-config      
+      (python3.withPackages (ps: [ ps.setuptools ps.distutils ps.pip]))
+      quilt
       rsync
+      squashfsTools
       subversion
       swig
       systemd
@@ -40,9 +48,22 @@ let
       which
       zlib
       zlib.static
+      zstd
     ] ++ extraPkgs;
+     shellHook = ''
+          # Find the most recent LLVM library path
+          LLVM_HOST_PATH=${pkgs.llvmPackages_latest.llvm}/bin
+          
+          # Export the LLVM host path
+          export LLVM_HOST_PATH
+
+          echo "OpenWrt development shell"
+          echo "LLVM Host Path: $LLVM_HOST_PATH"
+          echo "ncurses-dev Path: ${pkgs.ncurses.dev}"
+        '';
     multiPkgs = null;
     extraOutputsToInstall = [ "dev" ];
+    hardeningDisable = [ "all" ];
     profile = ''
       export hardeningDisable=all
     '';
