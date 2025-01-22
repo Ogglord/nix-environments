@@ -40,7 +40,11 @@ let
       go
       less
       libelf
+      clang-tools
       llvmPackages_latest.llvm
+      llvmPackages_latest.libstdcxxClang
+      llvmPackages_latest.libclang
+      llvmPackages_latest.libcxx
       ncdu 
       ncurses5           
       openssl
@@ -76,7 +80,9 @@ let
     profile = ''
       export hardeningDisable=all
       export PERL5LIB="${pkgs.perl}/lib/perl5/site_perl:${pkgs.perl}/lib/perl5/5.40.0:${pkgs.perl}/lib/perl5/5.40.0/x86_64-linux-thread-multi"
-      export LLVM_HOST_PATH=${pkgs.llvmPackages_latest.llvm}/bin      
+      export LLVM_HOST_PATH="${pkgs.llvmPackages_latest.llvm}/bin:${pkgs.llvmPackages_latest.libclang}/bin:${pkgs.llvmPackages_latest.libcxx}/bin"
+      export LLVM_CLANG=${pkgs.llvmPackages_latest.libclang}/bin
+      export LLVM_CXXLANG=${pkgs.llvmPackages_latest.libcxx}/bin
       ## apply our fixes, i.e. set in .config (CONFIG_BPF_TOOLCHAIN_HOST_PATH=$LLVM_HOST_PATH)
       apply-nix-fixes --verbose
       echo ""
