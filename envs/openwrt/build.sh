@@ -193,8 +193,7 @@ download_apps(){
 build() {
     case $MODE in
         debug)
-            # Build in debug mode
-            set -x
+            # Build in debug mode            
             log "info" "Starting build process in DEBUG mode..."
             log "info" "Running make with debug output..."
             make -j1 V=s 2>&1 | tee "$LOG_DIR/build_debug.log"
