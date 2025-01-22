@@ -47,6 +47,7 @@ let
       openssh
       patch
       perl
+      perl540Packages.CPAN
       pkg-config      
       (python3.withPackages (ps: [ ps.setuptools ps.distutils ps.pip]))
       quilt
@@ -74,6 +75,7 @@ let
     hardeningDisable = [ "all" ];
     profile = ''
       export hardeningDisable=all
+      export PERL5LIB="${pkgs.perl}/lib/perl5/site_perl"
       export LLVM_HOST_PATH=${pkgs.llvmPackages_latest.llvm}/bin
       apply-nix-fixes
       echo "Note: You can the nix fix script by executing \"apply-nix-fixes\"";
