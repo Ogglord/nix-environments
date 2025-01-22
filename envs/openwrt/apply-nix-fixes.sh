@@ -1,52 +1,137 @@
 #!/usr/bin/env bash
+# OpenWrt Nix Environment Fixes Script
+# Applies automatic adjustments to resolve common configuration and symlink issues
 
-# Nix fixes for OpenWrt environment
-echo "Welcome to OpenWrt Build Shell!"
-echo "Checking for broken symlinks in staging_dir/host/bin"
-# Check if a directory exists
-if [ -d "./staging_dir/host/bin" ]; then
-    pushd staging_dir/host/bin
-    if broken_links=$(find . -xtype l -print); then 
-        if [ -n "$broken_links" ]; then 
-            echo "WARNING: Broken symlinks found:"; 
-            echo "$broken_links"; 
-            exit 1; 
-        else 
-            echo "No broken symlinks found."; 
-        fi
-    else 
-        echo "Error searching for symlinks."; 
-        exit 1; 
-    fi        
-  else
-    echo "SKIPPED: Directory does not exist yet"
-  fi
+# Strict error handling
+set -euo pipefail
 
+# Logging and verbosity control
+VERBOSE=false
+LOG_FILE="/tmp/openwrt-nix-fixes.log"
 
-echo "Configuring LLVM toolchain settings in .config"        
-if [ -z "$LLVM_HOST_PATH" ]; then
-    echo "Error: LLVM_HOST_PATH is not set or is empty"
-else
-  if [ -e ".config" ]; then
-    # Unset CONFIG_BPF_TOOLCHAIN_BUILD_LLVM
-    if grep -q "CONFIG_BPF_TOOLCHAIN_BUILD_LLVM=y" .config; then
-      echo "Unsetting CONFIG_BPF_TOOLCHAIN_BUILD_LLVM"
-      sed -i -e 's|CONFIG_BPF_TOOLCHAIN_BUILD_LLVM=y|# CONFIG_BPF_TOOLCHAIN_BUILD_LLVM is not set|' .config
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Logging function
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    # Always log to file
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    
+    # Conditionally print to console based on verbosity
+    if [[ "$VERBOSE" == "true" ]] || [[ "$level" == "ERROR" ]]; then
+        echo "[$level] $message" >&2
     fi
+}
 
-    # Handle CONFIG_BPF_TOOLCHAIN_HOST_PATH
-    if grep -q "CONFIG_BPF_TOOLCHAIN_HOST_PATH" .config; then
-      # If it exists, replace the existing line
-      sed -i -e 's|CONFIG_BPF_TOOLCHAIN_HOST_PATH=.*|CONFIG_BPF_TOOLCHAIN_HOST_PATH="'$LLVM_HOST_PATH'"|' .config
+# Cleanup function to ensure proper directory restoration
+cleanup() {
+    local exit_code=$?
+    
+    # Attempt to return to original directory if we changed directories
+    if [ -n "${ORIGINAL_DIR:-}" ]; then
+        cd "$ORIGINAL_DIR"
+    fi
+    
+    log "INFO" "Script exiting with status $exit_code"
+    exit $exit_code
+}
+
+# Trap signals to ensure cleanup
+trap cleanup EXIT INT TERM
+
+# Store original directory
+ORIGINAL_DIR=$(pwd)
+
+# Main script
+log "INFO" "========================================================="
+log "INFO" "Applying automatic adjustments for OpenWrt environment..."
+log "INFO" "========================================================="
+
+# Check for broken symlinks in staging directory
+check_staging_symlinks() {
+    local staging_dir="./staging_dir/host/bin"
+    
+    if [ ! -d "$staging_dir" ]; then
+        log "WARN" "Staging directory does not exist: $staging_dir"
+        return 0
+    fi
+    
+    cd "$staging_dir"
+    
+    # Find and report broken symlinks
+    local broken_links
+    if ! broken_links=$(find . -xtype l -print); then
+        log "ERROR" "Failed to search for symlinks"
+        return 1
+    fi
+    
+    if [ -n "$broken_links" ]; then
+        log "ERROR" "Broken symlinks detected:"
+        echo "$broken_links" | while read -r link; do
+            log "ERROR" "Broken symlink: $link"
+        done
+        return 1
     else
-      echo "CONFIG_BPF_TOOLCHAIN_HOST_PATH was unset, adding it"
-      # If it doesn't exist, append the line to the end of the file
-      echo 'CONFIG_BPF_TOOLCHAIN_HOST_PATH="'$LLVM_HOST_PATH'"' >> .config
-      echo 'CONFIG_BPF_TOOLCHAIN_HOST=y' >> .config
-      echo 'CONFIG_USE_LLVM_HOST=y' >> .config
+        log "INFO" "No broken symlinks found in staging directory"
     fi
-    #echo "OK"
-  else
-    echo "SKIPPED: .config is missing"
-  fi
-fi
+}
+
+# Configure LLVM toolchain settings
+configure_llvm_toolchain() {
+    # Validate LLVM_HOST_PATH
+    if [ -z "${LLVM_HOST_PATH:-}" ]; then
+        log "ERROR" "LLVM_HOST_PATH is not set or is empty"
+        return 1
+    fi
+    
+    local config_file=".config"
+    if [ ! -e "$config_file" ]; then
+        log "WARN" "Configuration file missing: $config_file"
+        return 0
+    fi
+    
+    # Unset BPF toolchain build flag
+    if grep -q "CONFIG_BPF_TOOLCHAIN_BUILD_LLVM=y" "$config_file"; then
+        log "INFO" "Unsetting CONFIG_BPF_TOOLCHAIN_BUILD_LLVM"
+        sed -i -e 's|CONFIG_BPF_TOOLCHAIN_BUILD_LLVM=y|# CONFIG_BPF_TOOLCHAIN_BUILD_LLVM is not set|' "$config_file"
+    fi
+    
+    # Handle LLVM host path configuration
+    if grep -q "CONFIG_BPF_TOOLCHAIN_HOST_PATH" "$config_file"; then
+        log "INFO" "Updating existing LLVM host path"
+        sed -i -e 's|CONFIG_BPF_TOOLCHAIN_HOST_PATH=.*|CONFIG_BPF_TOOLCHAIN_HOST_PATH="'"$LLVM_HOST_PATH"'"|' "$config_file"
+    else
+        log "INFO" "Adding LLVM host path configuration"
+        {
+            echo 'CONFIG_BPF_TOOLCHAIN_HOST_PATH="'"$LLVM_HOST_PATH"'"'
+            echo 'CONFIG_BPF_TOOLCHAIN_HOST=y'
+            echo 'CONFIG_USE_LLVM_HOST=y'
+        } >> "$config_file"
+    fi
+}
+
+# Execute main functions
+main() {
+    check_staging_symlinks
+    configure_llvm_toolchain
+    
+    log "INFO" "OpenWrt Nix fixes applied successfully"
+}
+
+# Run main script
+main
