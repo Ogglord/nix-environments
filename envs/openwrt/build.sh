@@ -1,10 +1,13 @@
 #!/bin/bash
 set -e
 
+echo "OpenWrt Build Helper Script version 0.1 - github.com/Ogglord"
+echo "-"
+
 # Function to check dependencies
 check_dependencies() {
     # Check system commands
-    local deps=(make git)
+    local deps=(make git sed)
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" >/dev/null 2>&1; then
             echo "Error: Required command '$dep' not found"
@@ -26,9 +29,8 @@ usage() {
     echo "  full   - Update+Install Feeds               feeds.log "
     echo "           Download,                          download.log +"
     echo "           Build                              build.log"
-    echo "  simple - Build only                         build.log"
-    echo "  debug  - Build only with single thread      build_debug.log"
-    echo "  upload - Upload a build to git              git.log"
+    echo "  normal - Build only                         build.log"
+    echo "  debug  - Build (single thread verbose)      build_debug.log"    
     exit 1
 }
 
@@ -47,32 +49,6 @@ error_exit() {
 # Trap errors and call error_exit with the line number
 trap 'error_exit $LINENO' ERR
 
-upload_build() {
-    git config --global url."git@github.com:".insteadOf "https://github.com/"    
-    git config --global user.email "oag@proton.me"
-    git config --global user.name "Ogglord"
-
-    # Copy configuration files to the git directory
-    echo "Copying .config and diffconfig to 'bin/config'..."
-    cp .config ./bin/config/
-    ./scripts/diffconfig.sh > diffconfig
-    cp diffconfig ./bin/config/
-
-    echo "Entering bin folder..."
-    pushd bin
-    
-    echo "Adding all files to git stage"
-    git add .
-    echo "Committing..."
-    git commit -m "Scripted commit post build.sh"
-    echo "Pushing to github..."
-    git push
-    echo "Changes committed and pushed successfully."
-
-    echo "Leaving bin folder..."
-    popd
-}
-
 update_install_feeds() {
     echo "Step 1. Updating and installing all feeds..."
     ./scripts/feeds update -a 2>&1 | tee feeds.log
@@ -88,7 +64,7 @@ update_install_feeds() {
 
 download_apps(){
     # Run make download
-    echo "Running 'make download'..."
+    echo "Running 'make -j1 V=s download'. Logging to download.log"
     make -j1 V=s download | tee download.log
 
 }
@@ -105,7 +81,7 @@ case $MODE in
         echo "Running make with debug output..."
         make -j1 V=s 2>&1 | tee build_debug.log
         ;;
-    full|simple)
+    full|normal)
         # Exit immediately on error for non-debug modes        
         echo "Starting build process in ${MODE^^} mode..."
         echo "Running make defconfig just in case..."
@@ -119,11 +95,6 @@ case $MODE in
         ;;
 esac
 
-    read -p "Do you want to commit and push changes to github? (y/n): " confirm
-    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-        upload_build               
-    fi
-
 }
 
 
@@ -135,14 +106,11 @@ case $MODE in
         download_apps
         build        
     ;;
-    simple)
+    normal)
         build        
     ;;
     debug)
         build
-    ;;
-    upload)
-        upload_build
     ;;    
     *)
     echo "invalid command"

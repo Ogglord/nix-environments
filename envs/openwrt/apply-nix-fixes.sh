@@ -35,4 +35,4 @@ else
   fi
 fi
 
-echo "Note: You can re-run this script by executing \"apply-nix-fixes\"";
+
