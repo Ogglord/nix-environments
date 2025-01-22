@@ -77,7 +77,7 @@ let
       export hardeningDisable=all
       export PERL5LIB="${pkgs.perl}/lib/perl5/site_perl:${pkgs.perl}/lib/perl5/5.40.0:${pkgs.perl}/lib/perl5/5.40.0/x86_64-linux-thread-multi"
       export LLVM_HOST_PATH=${pkgs.llvmPackages_latest.llvm}/bin      
-      apply-nix-fixes
+      apply-nix-fixes --verbose
       echo "Note: You can the nix fix script by executing \"apply-nix-fixes\"";
       echo "Note: You can use the OpenWRT build helper by executing \"build\"";
     '';

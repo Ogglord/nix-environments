@@ -99,8 +99,8 @@ configure_llvm_toolchain() {
         return 1
     fi
     
-    local config_file=".config"
-    if [ ! -a "$config_file" ]; then
+    local config_file="$ORIGINAL_DIR/.config"
+    if [ ! -e "$config_file" ]; then
         log "WARN" "Configuration file missing: $config_file"
         return 0
     fi
