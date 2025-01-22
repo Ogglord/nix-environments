@@ -75,8 +75,8 @@ let
     hardeningDisable = [ "all" ];
     profile = ''
       export hardeningDisable=all
-      export PERL5LIB="${pkgs.perl}/lib/perl5/site_perl"
-      export LLVM_HOST_PATH=${pkgs.llvmPackages_latest.llvm}/bin
+      export PERL5LIB="${pkgs.perl}/lib/perl5/:${pkgs.perl}/lib/perl5/5.40.0"
+      export LLVM_HOST_PATH=${pkgs.llvmPackages_latest.llvm}/bin      
       apply-nix-fixes
       echo "Note: You can the nix fix script by executing \"apply-nix-fixes\"";
       echo "Note: You can use the OpenWRT build helper by executing \"build\"";
